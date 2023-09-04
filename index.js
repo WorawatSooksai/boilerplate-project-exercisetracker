@@ -29,7 +29,8 @@ const exeSchema = new Schema({
   username: String, // String is shorthand for {type: String}
   description: String,
   duration: Number,
-  exedate: { type: Date }
+  exedate: Date,
+  userid: String
 
 });
 
@@ -55,22 +56,37 @@ app.post("/api/users", (req, res) => {
 app.post("/api/users/:_id/exercises", (req, res) => {
 
   if (req.params._id) {
+
+    // let timestamp = Date.parse(req.params.date);
+    //   if (isNaN(timestamp) == false) {
+    //     return res.json({error: "Invalid Date"});
+    //   } 
     let exeuser = User.findById(req.params._id).then((p => {
+      let edate = new Date(req.body.date).toDateString();
+      if (edate == "Invalid Date") {
+        edate = new Date().toDateString();
+      }
+
       let newExe = new Exe({
+        userid: p._id.toHexString(),
         username: p.username
         , description: req.body.description
-        , duration: req.body.duration
-        , exedate: new Date(req.body.date).toDateString()
-        , _id: p._id.toHexString()
+        , duration: parseInt(req.body.duration)
+        , exedate: new Date(edate)
+
       });
+
 
       newExe.save().then((data => {
         res.json({
+          _id: p._id.toHexString(),
           username: p.username
+          , date: new Date(req.body.date).toDateString()
+          , duration: parseInt(req.body.duration)
           , description: req.body.description
-          , duration: req.body.duration
-          , exedate: new Date(req.body.date).toDateString()
-          , _id: p._id.toHexString()
+
+
+
         });
       }))
     }));
@@ -84,8 +100,89 @@ app.post("/api/users/:_id/exercises", (req, res) => {
 
 });
 
-app.get('/api/users' ,(req,res)=>{
-  User.find().select({_id:1,username:1}).then(p=>{
+app.get('/api/users/:_id/logs', (req, res) => {
+
+
+
+  if (req.params._id) {
+
+
+    User.findById(req.params._id).then(p => {
+      let jsr = {
+        _id: p._id.toHexString(),
+        username: p.username,
+        count: 0,
+        log: []
+
+      };
+      let objexe = {
+        userid: p._id.toHexString()
+
+      };
+      if (req.query.from) {
+        let from = new Date(req.query.from);
+        objexe.exedate = { $gte: from };
+
+      }
+      if (req.query.to) {
+        let to = new Date(req.query.to);
+        objexe.exedate = { $lt: to };
+      }
+
+
+
+      if (req.query.limit) {
+        let limit = parseInt(req.query.limit);
+        console.log(limit);
+        let arr = Exe.find(objexe).limit(limit).then(p => { return p; });
+        arr.then(function (r) {
+          jsr.count = r.length;
+          for (let i = 0; i < r.length; i++) {
+
+            jsr.log.push({
+              description: r[i].description,
+              duration: parseInt(r[i].duration),
+              date: new Date(r[i].exedate).toDateString()
+            });
+
+
+          }
+
+
+          res.json(jsr);
+        });
+      } else {
+        let arr = Exe.find(objexe).then(p => { return p; });
+        arr.then(function (r) {
+          jsr.count = r.length;
+          for (let i = 0; i < r.length; i++) {
+
+            jsr.log.push({
+              description: r[i].description,
+              duration: parseInt(r[i].duration),
+              date: new Date(r[i].exedate).toDateString()
+            });
+
+
+          }
+          res.json(jsr);
+        });
+      }
+
+    });
+
+  } else {
+    User.find().then(p => {
+      p.forEach((i, r) => {
+        console.log(r[i]);
+      });
+    });
+  }
+
+});
+
+app.get('/api/users', (req, res) => {
+  User.find().select({ _id: 1, username: 1 }).then(p => {
     res.json(p);
   });
 });
